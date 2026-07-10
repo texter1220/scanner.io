@@ -1,0 +1,40 @@
+name: Update Baugesuche data
+
+# Täglicher "Scan": lädt die aktuellen Zürcher Baugesuche und aktualisiert die Karte.
+on:
+  schedule:
+    - cron: "0 3 * * *"      # täglich 03:00 UTC (~05:00 Zürich Sommerzeit)
+  workflow_dispatch: {}       # zusätzlich manuell startbar (Actions-Tab -> Run workflow)
+
+permissions:
+  contents: write             # nötig, damit die Action die aktualisierte Datei committen darf
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Baugesuche aktualisieren
+        run: python scripts/update-baugesuche.py docs/baugesuche.geojson
+
+      - name: Aktualisierte Daten committen
+        run: |
+          git config user.name "nachbar-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/baugesuche.geojson
+          if git diff --staged --quiet; then
+            echo "Keine Änderungen an den Baugesuchen."
+          else
+            git commit -m "Baugesuche aktualisiert ($(date -u +%Y-%m-%d))"
+            git push
+          fi
