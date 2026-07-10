@@ -113,7 +113,12 @@ def main():
             pass
     log(f"  {len(gdf)} Datensätze, CRS={gdf.crs}")
 
-    if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
+    # Koordinaten IMMER nach WGS84 bringen. Fehlt die CRS-Angabe im GeoPackage,
+    # LV95 (EPSG:2056) annehmen – sonst blieben die Zürcher Koordinaten bei ~2.6 Mio.
+    # und lägen weit ausserhalb jedes Lat/Lon-Umkreises (=> keine Treffer).
+    if gdf.crs is None:
+        gdf = gdf.set_crs(epsg=2056)
+    if gdf.crs.to_epsg() != 4326:
         gdf = gdf.to_crs(epsg=4326)
 
     cols = {c.lower(): c for c in gdf.columns}
@@ -143,6 +148,8 @@ def main():
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False)
+    if features:
+        log(f"  Beispiel-Koordinate (lon,lat): {features[0]['geometry']['coordinates']}  (muss ~[8.x, 47.x] sein)")
     log(f"OK: {len(features)} Baugesuche -> {out_path} (Stand {out['updated']})")
 
 
