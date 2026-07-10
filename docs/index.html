@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="de-CH" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Nachbar-Radar · Live · Bauprojekt-Risikomonitor</title>
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#060b12; --bg2:#0a1420;
+  --panel:rgba(14,24,38,.72); --panel-solid:#0e1826;
+  --border:rgba(84,214,180,.16); --border2:rgba(120,160,190,.14);
+  --green:#2fe6a6; --green-soft:rgba(47,230,166,.14);
+  --cyan:#35d0f0; --warn:#ffb02e; --danger:#ff5470;
+  --text:#e7f1f6; --muted:#8098aa;
+  --radius:16px;
+  --font:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  --mono:'SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--font);color:var(--text);
+  background:
+    radial-gradient(1200px 700px at 78% -10%, rgba(53,208,240,.10), transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, rgba(47,230,166,.09), transparent 55%),
+    var(--bg);
+  min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px clamp(14px,3vw,32px) 60px}
+
+header.topbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:6px 2px 16px}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{width:46px;height:46px;border-radius:13px;position:relative;flex:0 0 auto;
+  background:radial-gradient(circle at 50% 50%,rgba(47,230,166,.35),rgba(6,11,18,.2));
+  border:1px solid var(--border);display:grid;place-items:center;overflow:hidden}
+.logo::after{content:"";position:absolute;inset:0;border-radius:13px;
+  background:conic-gradient(from 0deg,transparent 0deg,rgba(47,230,166,.55) 60deg,transparent 130deg);
+  animation:sweep 3.2s linear infinite;opacity:.8}
+.logo span{position:relative;z-index:2;font-size:20px;color:var(--green)}
+.brand h1{font-size:19px;margin:0;letter-spacing:.4px}
+.brand p{margin:2px 0 0;font-size:12.5px;color:var(--muted);letter-spacing:.3px}
+.topbar .spacer{flex:1}
+.status-pill{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--muted);
+  background:var(--panel);border:1px solid var(--border2);padding:8px 14px;border-radius:999px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.live{background:var(--green);box-shadow:0 0 0 0 rgba(47,230,166,.6);animation:pulse 2s infinite}
+.dot.err{background:var(--danger)}
+
+/* provenance strip */
+.prov{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.prov .src{flex:1;min-width:220px;background:var(--panel);border:1px solid var(--border2);
+  border-radius:12px;padding:11px 14px;font-size:12.5px;color:var(--muted)}
+.prov .src b{color:var(--text);font-weight:600}
+.prov .src .st{font-family:var(--mono);font-size:11.5px;margin-top:3px;display:block}
+.st.ok{color:var(--green)} .st.warn{color:var(--warn)} .st.err{color:var(--danger)}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.kpi{background:var(--panel);border:1px solid var(--border2);border-radius:var(--radius);
+  padding:15px 17px;position:relative;overflow:hidden}
+.kpi .lab{font-size:11.5px;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted)}
+.kpi .val{font-size:31px;font-weight:650;margin-top:6px;font-family:var(--mono);line-height:1}
+.kpi .sub{font-size:11.5px;color:var(--muted);margin-top:6px}
+.kpi.k-green .val{color:var(--green)} .kpi.k-cyan .val{color:var(--cyan)}
+.kpi.k-warn .val{color:var(--warn)} .kpi.k-danger .val{color:var(--danger)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.k-green::before{background:var(--green)} .kpi.k-cyan::before{background:var(--cyan)}
+.kpi.k-warn::before{background:var(--warn)} .kpi.k-danger::before{background:var(--danger)}
+
+.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--border2);border-radius:var(--radius);
+  padding:18px;backdrop-filter:blur(4px)}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);
+  margin:0 0 14px;display:flex;align-items:center;gap:9px}
+.card h2 .bar{width:20px;height:2px;background:var(--green);border-radius:2px}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:11.5px;color:var(--muted);letter-spacing:.3px}
+.field input,.field select{background:#081320;border:1px solid var(--border2);color:var(--text);
+  padding:11px 12px;border-radius:10px;font-size:14px;font-family:var(--font);outline:none;transition:.15s;width:100%}
+.field input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.field input::placeholder{color:#4d6273}
+.two{display:grid;grid-template-columns:1fr 130px;gap:11px}
+.btn{cursor:pointer;border:none;border-radius:10px;font-size:13.5px;font-weight:600;
+  padding:11px 16px;font-family:var(--font);transition:.15s;letter-spacing:.2px}
+.btn-primary{background:linear-gradient(135deg,var(--green),#1fbf8a);color:#03130d}
+.btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:wait;transform:none}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--green-soft);border-color:var(--green)}
+.btn-sm{padding:7px 12px;font-size:12px;border-radius:8px}
+.row-btns{display:flex;gap:10px;margin-top:11px;flex-wrap:wrap}
+.hint{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+
+.radar-shell{display:flex;flex-direction:column;align-items:center;margin-top:6px}
+.radar{position:relative;width:min(440px,86vw);aspect-ratio:1;margin:6px auto 2px}
+.radar .ring{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(84,214,180,.14)}
+.radar .ring.r2{inset:16.6%}.radar .ring.r3{inset:33.3%}.radar .ring.r4{inset:50%}
+.radar .cross{position:absolute;background:rgba(84,214,180,.10)}
+.radar .cross.h{left:0;right:0;top:50%;height:1px}
+.radar .cross.v{top:0;bottom:0;left:50%;width:1px}
+.radar .compass{position:absolute;font-size:10px;color:var(--muted);font-family:var(--mono)}
+.radar .compass.n{top:2px;left:50%;transform:translateX(-50%)}
+.radar .compass.s{bottom:2px;left:50%;transform:translateX(-50%)}
+.radar .compass.e{right:3px;top:50%;transform:translateY(-50%)}
+.radar .compass.w{left:3px;top:50%;transform:translateY(-50%)}
+.radar .glow{position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 60px rgba(47,230,166,.10);pointer-events:none}
+.radar .sweep{position:absolute;inset:0;border-radius:50%;overflow:hidden;pointer-events:none}
+.radar .sweep::before{content:"";position:absolute;left:50%;top:50%;width:50%;height:50%;transform-origin:top left;
+  background:conic-gradient(from 0deg,rgba(47,230,166,.30),rgba(47,230,166,.02) 42deg,transparent 60deg);
+  animation:sweep 4s linear infinite}
+.radar.scanning .sweep::before{animation-duration:1.15s}
+.rradius-lbl{position:absolute;left:50%;top:3px;transform:translateX(-50%);font-size:9.5px;color:var(--muted);font-family:var(--mono)}
+.center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.center .pin{width:16px;height:16px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 6px rgba(53,208,240,.18),0 0 16px rgba(53,208,240,.8)}
+.center .lbl{font-size:10.5px;color:var(--cyan);font-weight:600;letter-spacing:.3px;background:rgba(6,11,18,.7);padding:2px 7px;border-radius:6px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blip{position:absolute;transform:translate(-50%,-50%);z-index:3;cursor:pointer}
+.blip .d{width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px var(--green-soft),0 0 12px rgba(47,230,166,.7);animation:blipIn .5s ease both}
+.blip.risk-high .d{background:var(--danger);box-shadow:0 0 0 4px rgba(255,84,112,.16),0 0 12px rgba(255,84,112,.75)}
+.blip.risk-med .d{background:var(--warn);box-shadow:0 0 0 4px rgba(255,176,46,.16),0 0 12px rgba(255,176,46,.7)}
+.blip .tag{position:absolute;left:16px;top:-4px;font-size:10.5px;white-space:nowrap;color:var(--text);background:rgba(6,11,18,.85);border:1px solid var(--border2);padding:2px 7px;border-radius:6px;opacity:0;transition:.15s;pointer-events:none;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.blip:hover .tag{opacity:1}
+.radar-legend{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--muted)}
+.radar-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-inline-end:5px;vertical-align:middle}
+.scanline{font-family:var(--mono);font-size:11.5px;color:var(--green);text-align:center;min-height:16px;margin-top:8px;letter-spacing:.3px}
+.scanline.err{color:var(--danger)}
+
+.tabs{display:flex;gap:6px;margin-bottom:14px;background:#081320;padding:5px;border-radius:12px;border:1px solid var(--border2)}
+.tab{flex:1;text-align:center;cursor:pointer;padding:9px 6px;border-radius:8px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.2px;transition:.15s}
+.tab .cnt{display:inline-block;min-width:16px;font-size:10.5px;background:var(--green-soft);color:var(--green);border-radius:20px;padding:1px 6px;margin-inline-start:5px}
+.tab.active{background:var(--green-soft);color:var(--green)}
+.pane{display:none}.pane.active{display:block}
+
+.list{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto;padding-right:3px}
+.list::-webkit-scrollbar{width:8px}.list::-webkit-scrollbar-thumb{background:rgba(120,160,190,.2);border-radius:8px}
+.item{background:#0a1420;border:1px solid var(--border2);border-radius:12px;padding:13px 14px;transition:.15s}
+.item:hover{border-color:var(--border)}
+.item.sel{border-color:var(--green);background:linear-gradient(90deg,var(--green-soft),#0a1420 60%)}
+.item .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.item .nm{font-size:14.5px;font-weight:600}
+.item .meta{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.item .foot{display:flex;justify-content:space-between;align-items:center;margin-top:11px;gap:8px}
+.chip{font-size:10.5px;padding:3px 9px;border-radius:20px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.chip.ok{background:var(--green-soft);color:var(--green)}
+.chip.warn{background:rgba(255,176,46,.14);color:var(--warn)}
+.chip.danger{background:rgba(255,84,112,.14);color:var(--danger)}
+.chip.mut{background:rgba(120,160,190,.12);color:var(--muted)}
+.alert .desc{font-size:12.5px;color:#b9cad6;margin-top:7px;line-height:1.45}
+.frist{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:9px}
+.frist b{font-family:var(--mono);font-size:14px}
+.frist.dgr b{color:var(--danger)}.frist.wrn b{color:var(--warn)}.frist.okk b{color:var(--green)}
+.pbar{height:5px;background:#0e1c2a;border-radius:5px;overflow:hidden;flex:1}
+.pbar i{display:block;height:100%;border-radius:5px}
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:26px 10px;line-height:1.6}
+.addbox{background:#081320;border:1px dashed var(--border);border-radius:12px;padding:14px;margin-bottom:14px}
+
+.src-doc{font-size:12.5px;color:#b9cad6;line-height:1.6}
+.src-doc code{background:#081320;border:1px solid var(--border2);border-radius:6px;padding:1px 6px;font-family:var(--mono);font-size:11.5px;color:var(--green);word-break:break-all}
+.src-doc h4{margin:16px 0 6px;font-size:12.5px;color:var(--text);text-transform:uppercase;letter-spacing:.6px}
+.src-doc ol{margin:6px 0 0;padding-inline-start:20px}.src-doc li{margin-bottom:5px}
+
+.toast-wrap{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:10px;z-index:50}
+.toast{background:var(--panel-solid);border:1px solid var(--green);border-radius:12px;padding:13px 16px;min-width:280px;max-width:360px;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:toastIn .3s ease both}
+.toast.warn{border-color:var(--warn)}
+.toast .tt{font-size:13.5px;font-weight:650;color:var(--green);display:flex;align-items:center;gap:8px}
+.toast.warn .tt{color:var(--warn)}
+.toast .tb{font-size:12.5px;color:#b9cad6;margin-top:5px;line-height:1.5}
+.overlay{position:fixed;inset:0;background:rgba(3,7,12,.72);backdrop-filter:blur(3px);display:none;place-items:center;z-index:60;padding:20px}
+.overlay.show{display:grid}
+.modal{background:var(--panel-solid);border:1px solid var(--border);border-radius:18px;width:min(560px,94vw);padding:24px;animation:toastIn .25s ease both;max-height:90vh;overflow:auto}
+.modal h3{margin:0 0 4px;font-size:17px}
+.modal .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+.mail{background:#081320;border:1px solid var(--border2);border-radius:12px;padding:16px;font-size:13px;line-height:1.6}
+.mail .mrow{display:flex;gap:8px;margin-bottom:4px}.mail .mk{color:var(--muted);min-width:64px;font-size:12px}
+.mail hr{border:none;border-top:1px solid var(--border2);margin:12px 0}
+.modal .m-btns{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+
+.disclaimer{margin-top:24px;background:rgba(255,176,46,.06);border:1px solid rgba(255,176,46,.2);border-radius:14px;padding:16px 18px;font-size:12.5px;color:#c9d6de;line-height:1.6}
+.disclaimer b{color:var(--warn)}
+footer.legal{margin-top:22px;text-align:center;font-size:11.5px;color:var(--muted)}
+footer.legal a{color:var(--muted)}
+
+@keyframes sweep{to{transform:rotate(360deg)}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,230,166,.55)}70%{box-shadow:0 0 0 8px rgba(47,230,166,0)}100%{box-shadow:0 0 0 0 rgba(47,230,166,0)}}
+@keyframes blipIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes toastIn{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media(max-width:920px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"><span>◎</span></div>
+      <div><h1>NACHBAR-RADAR <span style="font-size:11px;color:var(--green);border:1px solid var(--border);padding:2px 7px;border-radius:6px;vertical-align:middle;margin-left:6px">LIVE</span></h1>
+      <p>Bauprojekt-Risikomonitor · Kanton Zürich · Admicasa Holding AG</p></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="status-pill"><span class="dot live" id="geoDot"></span> swisstopo / GeoAdmin</div>
+    <div class="status-pill"><span class="dot" id="bauDot"></span> <span id="bauPillText">Baugesuche ZH</span></div>
+  </header>
+
+  <section class="prov">
+    <div class="src">
+      <b>Parzelle & Adresse</b> — swisstopo / GeoAdmin (Bund), live im Browser.
+      <span class="st ok" id="geoSt">Bereit · Suche nach Adresse oder Parzelle</span>
+    </div>
+    <div class="src">
+      <b>Baugesuche (Baublatt)</b> — Kanton Zürich Open Government Data, täglich aktualisiert.
+      <span class="st warn" id="bauSt">Datenquelle noch nicht geladen</span>
+    </div>
+  </section>
+
+  <section class="kpis">
+    <div class="kpi k-cyan"><div class="lab">Projekte</div><div class="val" id="kpiProjects">0</div><div class="sub">im Portfolio</div></div>
+    <div class="kpi k-green"><div class="lab">Baugesuche im Umkreis</div><div class="val" id="kpiNear">–</div><div class="sub" id="kpiNearSub">kein Grundstück gewählt</div></div>
+    <div class="kpi k-warn"><div class="lab">Offene Einsprachefristen</div><div class="val" id="kpiOpen">–</div><div class="sub">≤ 20 Tage seit Publikation</div></div>
+    <div class="kpi k-danger"><div class="lab">Nächste Frist</div><div class="val" id="kpiDeadline">–</div><div class="sub" id="kpiDeadlineSub">keine offene Frist</div></div>
+  </section>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="card">
+      <h2><span class="bar"></span> Grundstück scannen</h2>
+      <div class="field">
+        <label for="fQuery">Adresse oder Parzelle (z.B. «Seestrasse 5, 8802 Kilchberg» oder «Kilchberg 1428»)</label>
+        <div class="two">
+          <input id="fQuery" placeholder="Adresse, Ort oder Parzellennummer eingeben …">
+          <select id="fRadius" aria-label="Umkreis">
+            <option value="150">150 m</option>
+            <option value="300" selected>300 m</option>
+            <option value="500">500 m</option>
+            <option value="800">800 m</option>
+            <option value="1200">1200 m</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-btns">
+        <button class="btn btn-primary" id="btnScan">▸ Live-Scan starten</button>
+        <button class="btn btn-ghost" id="btnRescan">↻ Erneut</button>
+      </div>
+      <div class="hint">Die Parzelle/Adresse wird live bei swisstopo aufgelöst. Blips = echte Baugesuche des Kantons Zürich im gewählten Umkreis (sobald die Datenquelle geladen ist – siehe Tab «Datenquelle»).</div>
+
+      <div class="radar-shell">
+        <div class="radar" id="radar">
+          <div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div><div class="ring r4"></div>
+          <div class="cross h"></div><div class="cross v"></div>
+          <div class="compass n">N</div><div class="compass s">S</div><div class="compass e">O</div><div class="compass w">W</div>
+          <div class="rradius-lbl rradius" id="radiusLbl"></div>
+          <div class="glow"></div><div class="sweep"></div>
+          <div class="center"><div class="pin"></div><div class="lbl" id="centerLbl">Kein Grundstück</div></div>
+        </div>
+        <div class="scanline" id="scanLine"></div>
+        <div class="radar-legend">
+          <span><i style="background:#35d0f0"></i>Ihr Grundstück</span>
+          <span><i style="background:#ff5470"></i>Frist ≤ 3 Tg</span>
+          <span><i style="background:#ffb02e"></i>Frist ≤ 7 Tg</span>
+          <span><i style="background:#2fe6a6"></i>laufend / später</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" data-tab="projects">Projekte<span class="cnt" id="tabCntProjects">0</span></div>
+        <div class="tab" data-tab="alerts">Meldungen<span class="cnt" id="tabCntAlerts">0</span></div>
+        <div class="tab" data-tab="source">Datenquelle</div>
+      </div>
+
+      <div class="pane active" data-pane="projects">
+        <div class="addbox">
+          <div class="field">
+            <label for="pName">Projektname</label>
+            <input id="pName" placeholder="z.B. Neubau MFH Seestrasse">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label for="pQuery">Adresse / Parzelle</label>
+            <input id="pQuery" placeholder="z.B. Seestrasse 5, 8802 Kilchberg">
+          </div>
+          <div class="row-btns"><button class="btn btn-primary btn-sm" id="btnAddProject">＋ Projekt erfassen & lokalisieren</button></div>
+        </div>
+        <div class="list" id="projectList"></div>
+      </div>
+
+      <div class="pane" data-pane="alerts">
+        <div class="row-btns" style="margin-bottom:12px">
+          <button class="btn btn-ghost btn-sm" id="btnNotifyAll">✉ Offene Fristen melden</button>
+        </div>
+        <div class="list" id="alertList"></div>
+      </div>
+
+      <div class="pane" data-pane="source">
+        <div class="field">
+          <label for="fData">Baugesuche-Datenquelle (GeoJSON, WGS84)</label>
+          <input id="fData" value="baugesuche.geojson">
+        </div>
+        <div class="row-btns"><button class="btn btn-primary btn-sm" id="btnLoadData">⟲ Datenquelle laden</button></div>
+        <div class="src-doc">
+          <h4>So wird der Radar «echt»</h4>
+          Der Radar zeigt echte Zürcher Baugesuche, sobald eine schlanke Karte-Datei <code>baugesuche.geojson</code> neben dieser Seite liegt. Diese wird aus den offiziellen, täglich aktualisierten Kantonsdaten erzeugt:
+          <ol>
+            <li>Amtliche Quelle (täglich): <code>daten.statistik.zh.ch/ogd/daten/ressourcen/KTZH_00002982_00006403.gpkg</code></li>
+            <li>Das mitgelieferte Skript <code>update-baugesuche.py</code> lädt diese Datei, rechnet die Koordinaten von LV95 nach WGS84 um und schreibt <code>baugesuche.geojson</code>.</li>
+            <li>Für den Automatik-Betrieb (täglicher Scan) läuft dieses Skript einmal pro Tag – lokal per Aufgabenplanung oder gratis via GitHub Action.</li>
+          </ol>
+          <h4>Ehrliche Grenzen</h4>
+          Der offene Datensatz enthält Projektstandort, Kataster-/BFS-Nummer und Projektbeschrieb, aber <b>keine Namen/Adressen der Bauherrschaft</b> (Datenschutz). Abdeckung: <b>nur Kanton Zürich</b>. Ein gefiltertes Baugesuch belegt kein realisiertes Bauvorhaben.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <b>Live-Prototyp.</b> Grundstück/Adresse werden in Echtzeit über swisstopo/GeoAdmin aufgelöst. Die Baugesuch-Blips stammen aus den offiziellen Open-Data des Kantons Zürich und erscheinen, sobald die Datenquelle geladen ist. E-Mail-Versand ist hier als Vorschau simuliert – der produktive Versand läuft über den täglichen Hintergrund-Job. Es werden keine Daten fabriziert: ohne verbundene Quelle zeigt der Radar keine Baugesuche. Projekte werden lokal im Browser gespeichert.
+  </div>
+
+  <footer class="legal">Nachbar-Radar · Live-Prototyp · Daten: swisstopo/GeoAdmin &amp; © Kanton Zürich (OGD) · <span id="yr"></span></footer>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>E-Mail-Benachrichtigung</h3>
+    <div class="sub">Vorschau der Benachrichtigung, die der Dienst automatisch versenden würde (Simulation).</div>
+    <div class="mail" id="mailBody"></div>
+    <div class="m-btns">
+      <button class="btn btn-ghost btn-sm" id="btnCloseModal">Schliessen</button>
+      <button class="btn btn-primary btn-sm" id="btnSendModal">✉ Senden (Demo)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const USER_EMAIL="fabio.visentin@admicasa.ch";
+const LS_KEY="nachbarradar.live.projects.v1";
+const GEO_URL="https://api3.geo.admin.ch/rest/services/api/SearchServer";
+const FRIST_TAGE=20; // gesetzliche Einsprache-/Auflagefrist Kanton Zürich
+
+let projects=[];
+let currentId=null;
+let bau=[];               // geladene Baugesuche: {lat,lon,desc,status,gemeinde,bfs,kataster,pubDate}
+let bauMeta={loaded:false,count:0,updated:null,error:null};
+
+const $=s=>document.querySelector(s);
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function stripHtml(s){return String(s==null?"":s).replace(/<[^>]*>/g,"").trim();}
+function uid(){return "p"+Date.now().toString(36)+Math.floor(Math.random()*9999).toString(36);}
+
+/* ---------- Persistence ---------- */
+function load(){ try{projects=JSON.parse(localStorage.getItem(LS_KEY))||[];}catch(e){projects=[];} }
+function save(){ try{localStorage.setItem(LS_KEY,JSON.stringify(projects));}catch(e){} }
+function cur(){ return projects.find(p=>p.id===currentId)||null; }
+
+/* ---------- Geo helpers ---------- */
+function toRad(d){return d*Math.PI/180;}
+function haversine(a,b,c,d){ // meters between (lat a,lon b) and (lat c,lon d)
+  const R=6371000,dLat=toRad(c-a),dLon=toRad(d-b);
+  const s=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+function bearing(a,b,c,d){ // degrees 0=N from (a,b) to (c,d)
+  const y=Math.sin(toRad(d-b))*Math.cos(toRad(c));
+  const x=Math.cos(toRad(a))*Math.sin(toRad(c))-Math.sin(toRad(a))*Math.cos(toRad(c))*Math.cos(toRad(d-b));
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
+/* ---------- GeoAdmin live geocode ---------- */
+async function geocode(q){
+  const url=GEO_URL+"?type=locations&sr=4326&lang=de&limit=6&searchText="+encodeURIComponent(q);
+  const r=await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const j=await r.json();
+  return (j.results||[]).map(x=>({
+    lat:x.attrs.lat, lon:x.attrs.lon,
+    label:stripHtml(x.attrs.label), detail:x.attrs.detail||"", origin:x.attrs.origin||""
+  })).filter(x=>typeof x.lat==="number"&&typeof x.lon==="number");
+}
+
+/* ---------- Baugesuche datasource ---------- */
+async function loadData(url){
+  bauMeta={loaded:false,count:0,updated:null,error:null};
+  renderSourceStatus("loading");
+  try{
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const gj=await r.json();
+    const feats=(gj&&gj.features)||[];
+    bau=feats.map(f=>{
+      const g=f.geometry||{}; let lon,lat;
+      if(g.type==="Point"){[lon,lat]=g.coordinates;}
+      else if(g.coordinates){ const c=flatFirst(g.coordinates); lon=c[0]; lat=c[1]; }
+      const p=f.properties||{};
+      return {lon,lat,
+        desc:p.description||p.beschreibung||p.projekt||p.bauvorhaben||"Baugesuch",
+        status:p.status||p.verfahrensstand||"",
+        gemeinde:p.gemeinde||p.municipality||p.ort||"",
+        bfs:p.bfs||p.bfs_nr||p.bfsnr||"",
+        kataster:p.kataster||p.katasternummer||p.parzelle||p.kat_nr||"",
+        pubDate:p.publication||p.publikation||p.datum||p.pub_date||p.auflage_von||p.date||null};
+    }).filter(x=>typeof x.lat==="number"&&typeof x.lon==="number");
+    bauMeta={loaded:true,count:bau.length,updated:(gj.updated||gj.meta&&gj.meta.updated||null),error:null};
+    renderSourceStatus("ok");
+    return true;
+  }catch(e){
+    bau=[]; bauMeta={loaded:false,count:0,updated:null,error:String(e.message||e)};
+    renderSourceStatus("err");
+    return false;
+  }
+}
+function flatFirst(a){ while(Array.isArray(a[0])) a=a[0]; return a; }
+
+/* ---------- Nearby computation ---------- */
+function nearbyFor(p){
+  if(!p||!p.lat||!bauMeta.loaded) return [];
+  const R=p.radius||300;
+  const out=[];
+  for(const b of bau){
+    const dist=haversine(p.lat,p.lon,b.lat,b.lon);
+    if(dist<=R){
+      out.push({...b, dist, brg:bearing(p.lat,p.lon,b.lat,b.lon), daysLeft:fristLeft(b.pubDate)});
+    }
+  }
+  out.sort((a,b)=> (a.daysLeft==null?9999:a.daysLeft) - (b.daysLeft==null?9999:b.daysLeft) || a.dist-b.dist);
+  return out;
+}
+function fristLeft(pub){
+  if(!pub) return null;
+  const d=new Date(pub); if(isNaN(d)) return null;
+  const end=new Date(d.getTime()+FRIST_TAGE*86400000);
+  return Math.ceil((end-new Date())/86400000);
+}
+function fristEnd(pub){
+  if(!pub) return "–";
+  const d=new Date(pub); if(isNaN(d)) return "–";
+  return new Date(d.getTime()+FRIST_TAGE*86400000).toLocaleDateString("de-CH",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+
+/* ---------- Rendering ---------- */
+function renderSourceStatus(state){
+  const dot=$("#bauDot"),st=$("#bauSt"),pill=$("#bauPillText");
+  if(state==="loading"){dot.className="dot";st.className="st warn";st.textContent="Lade Datenquelle …";pill.textContent="Baugesuche ZH · lädt";}
+  else if(state==="ok"){dot.className="dot live";st.className="st ok";
+    st.textContent=bauMeta.count+" Baugesuche geladen"+(bauMeta.updated?" · Stand "+bauMeta.updated:"");
+    pill.textContent="Baugesuche ZH · "+bauMeta.count;}
+  else if(state==="err"){dot.className="dot err";st.className="st err";
+    st.textContent="Nicht geladen: "+(bauMeta.error||"Datei fehlt")+" — Tab «Datenquelle»";pill.textContent="Baugesuche ZH · offline";}
+  else {dot.className="dot";st.className="st warn";st.textContent="Datenquelle noch nicht geladen";}
+}
+
+function renderProjects(){
+  const list=$("#projectList");list.innerHTML="";
+  if(!projects.length){list.innerHTML='<div class="empty">Noch keine Projekte.<br>Erfassen Sie oben Ihr erstes Bauprojekt.</div>';}
+  projects.forEach(p=>{
+    const near=nearbyFor(p);
+    const open=near.filter(n=>n.daysLeft!=null&&n.daysLeft>0).length;
+    const loc = p.lat? "📍 "+esc(p.gemeinde||"lokalisiert") : "⚠ nicht lokalisiert";
+    const el=document.createElement("div");el.className="item"+(p.id===currentId?" sel":"");el.dataset.pid=p.id;
+    el.innerHTML=`<div class="top"><div><div class="nm">${esc(p.name)}</div>
+      <div class="meta">${loc}${p.lat?" · "+p.lat.toFixed(5)+", "+p.lon.toFixed(5):""}</div></div>
+      ${p.lat?(open?`<span class="chip warn">${open} offen</span>`:(bauMeta.loaded?'<span class="chip ok">ruhig</span>':'<span class="chip mut">—</span>')):'<span class="chip danger">?</span>'}</div>
+      <div class="foot"><span class="meta">${esc(p.query||"")}</span>
+      <button class="btn btn-ghost btn-sm" data-open="${p.id}">Öffnen ▸</button></div>`;
+    list.appendChild(el);
+  });
+}
+
+function renderAlerts(){
+  const list=$("#alertList");const p=cur();list.innerHTML="";
+  if(!p){list.innerHTML='<div class="empty">Wählen Sie links ein Projekt oder starten Sie einen Scan.</div>';return;}
+  if(!bauMeta.loaded){list.innerHTML='<div class="empty">Baugesuch-Datenquelle nicht verbunden.<br>Öffnen Sie den Tab «Datenquelle».</div>';return;}
+  const near=nearbyFor(p);
+  if(!near.length){list.innerHTML='<div class="empty">Keine Baugesuche im '+(p.radius||300)+'-m-Umkreis.<br>Der Dienst prüft täglich neu.</div>';return;}
+  near.forEach(a=>{
+    const dl=a.daysLeft, st=dl==null?"mut":dl<=0?"mut":dl<=3?"danger":dl<=7?"warn":"ok";
+    const fcls=dl==null?"":dl<=3?"dgr":dl<=7?"wrn":"okk";
+    const pct=dl==null?0:Math.max(0,Math.min(100,Math.round(dl/FRIST_TAGE*100)));
+    const barcol=dl==null?"var(--muted)":dl<=3?"var(--danger)":dl<=7?"var(--warn)":"var(--green)";
+    const dirTxt=compass(a.brg);
+    const el=document.createElement("div");el.className="item alert";
+    el.innerHTML=`<div class="top"><div><div class="nm">${esc(a.desc).slice(0,90)}</div>
+      <div class="meta">${Math.round(a.dist)} m · ${dirTxt}${a.gemeinde?" · "+esc(a.gemeinde):""}${a.kataster?" · Kat. "+esc(String(a.kataster)):""}</div></div>
+      <span class="chip ${st}">${dl==null?"o. Datum":dl<=0?"abgelaufen":dl+" Tg"}</span></div>
+      ${a.status?`<div class="desc">Status: ${esc(a.status)}</div>`:""}
+      <div class="frist ${fcls}">Einsprachefrist ${a.pubDate?"bis "+fristEnd(a.pubDate):"– kein Publ.-Datum"} · <b>${dl==null?"–":dl<=0?"—":dl+" T"}</b>
+        <span class="pbar"><i style="width:${pct}%;background:${barcol}"></i></span></div>`;
+    list.appendChild(el);
+  });
+}
+function compass(b){const dirs=["N","NO","O","SO","S","SW","W","NW"];return dirs[Math.round(b/45)%8];}
+
+function renderRadar(animate){
+  const radar=$("#radar");radar.querySelectorAll(".blip").forEach(b=>b.remove());
+  const p=cur();
+  $("#centerLbl").textContent=p?(p.gemeinde?p.gemeinde:p.name):"Kein Grundstück";
+  $("#radiusLbl").textContent=p?((p.radius||300)+" m"):"";
+  if(!p||!p.lat) return;
+  const near=nearbyFor(p);const R=p.radius||300;
+  near.forEach((n,i)=>{
+    const rf=Math.min(1,n.dist/R)*46;
+    const x=50+Math.sin(toRad(n.brg))*rf;
+    const y=50-Math.cos(toRad(n.brg))*rf;
+    const risk=n.daysLeft==null?"":n.daysLeft<=3?"risk-high":n.daysLeft<=7?"risk-med":"";
+    const b=document.createElement("div");b.className="blip "+risk;b.style.left=x+"%";b.style.top=y+"%";
+    b.innerHTML=`<div class="d" style="animation-delay:${animate?i*70:0}ms"></div><div class="tag">${esc(n.desc).slice(0,60)} · ${Math.round(n.dist)}m</div>`;
+    radar.appendChild(b);
+  });
+}
+
+function renderKPIs(){
+  const p=cur();
+  $("#kpiProjects").textContent=projects.length;
+  $("#tabCntProjects").textContent=projects.length;
+  const near=p?nearbyFor(p):[];
+  $("#kpiNear").textContent=p&&p.lat?(bauMeta.loaded?near.length:"–"):"–";
+  $("#kpiNearSub").textContent=p&&p.lat?((p.radius||300)+" m Umkreis"):"kein Grundstück gewählt";
+  $("#tabCntAlerts").textContent=near.length;
+  const open=near.filter(n=>n.daysLeft!=null&&n.daysLeft>0);
+  $("#kpiOpen").textContent=bauMeta.loaded&&p&&p.lat?open.length:"–";
+  if(open.length){
+    const d=open[0].daysLeft;
+    $("#kpiDeadline").textContent=d+" Tg";
+    $("#kpiDeadlineSub").textContent=open[0].desc.slice(0,32);
+    $(".kpi.k-danger .val").style.color=d<=3?"var(--danger)":d<=7?"var(--warn)":"var(--green)";
+  }else{$("#kpiDeadline").textContent="–";$("#kpiDeadlineSub").textContent="keine offene Frist";}
+}
+function renderAll(a){renderProjects();renderAlerts();renderRadar(a);renderKPIs();}
+
+/* ---------- Scan flow ---------- */
+async function doScan(p){
+  const radar=$("#radar"),line=$("#scanLine");line.className="scanline";
+  radar.classList.add("scanning");
+  try{
+    line.textContent="Verbinde mit swisstopo / GeoAdmin …";
+    const res=await geocode(p.query);
+    if(!res.length){throw new Error("Keine Fundstelle für «"+p.query+"»");}
+    const hit=res[0];
+    p.lat=hit.lat;p.lon=hit.lon;p.gemeinde=extractGemeinde(hit);p.matched=hit.label;
+    save();
+    $("#geoSt").className="st ok";$("#geoSt").textContent="Gefunden: "+stripHtml(hit.label);
+    line.textContent="Parzelle lokalisiert · durchsuche Baugesuche im Umkreis …";
+    await sleep(500);
+    radar.classList.remove("scanning");
+    renderAll(true);
+    const n=nearbyFor(p).length;
+    line.textContent = bauMeta.loaded ? ("Scan abgeschlossen ✓ · "+n+" Baugesuch(e) im Umkreis") : "Standort ok ✓ · Baugesuch-Quelle nicht verbunden";
+    setTimeout(()=>{line.textContent="";},2600);
+  }catch(e){
+    radar.classList.remove("scanning");
+    line.className="scanline err";
+    line.textContent="Fehler: "+(e.message||e)+" (evtl. offline / lokal geöffnet)";
+    $("#geoSt").className="st err";$("#geoSt").textContent="Suche fehlgeschlagen – siehe Radar-Hinweis";
+  }
+}
+function extractGemeinde(hit){
+  // versucht Gemeinde/PLZ aus dem Label zu ziehen
+  const l=stripHtml(hit.label);
+  const m=l.match(/\d{4}\s+([A-Za-zäöüÄÖÜéèà\-\.\s]+)$/);
+  return m?m[1].trim():l.split(",").pop().trim().slice(0,40);
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+/* ---------- Notifications ---------- */
+function toast(title,body,warn){
+  const w=$("#toastWrap");const t=document.createElement("div");t.className="toast"+(warn?" warn":"");
+  t.innerHTML=`<div class="tt">${warn?"⚠":"✓"} ${esc(title)}</div><div class="tb">${body}</div>`;
+  w.appendChild(t);setTimeout(()=>{t.style.transition="opacity .4s";t.style.opacity="0";setTimeout(()=>t.remove(),400);},4600);
+}
+let pending=null;
+function openMail(list){
+  const p=cur();pending=list;
+  const rows=list.map(a=>`• ${esc(a.desc).slice(0,70)} — ${Math.round(a.dist)} m ${compass(a.brg)}<br>&nbsp;&nbsp;Einsprachefrist ${a.pubDate?"bis "+fristEnd(a.pubDate):"(kein Datum)"}${a.daysLeft!=null?" · noch "+(a.daysLeft<=0?0:a.daysLeft)+" Tage":""}`).join("<br>");
+  $("#mailBody").innerHTML=`<div class="mrow"><span class="mk">An:</span><span>${esc(USER_EMAIL)}</span></div>
+    <div class="mrow"><span class="mk">Betreff:</span><span>⚠ Nachbar-Radar: ${list.length} Baugesuch(e) bei «${esc(p.name)}»</span></div><hr>
+    <div>Guten Tag Fabio<br><br>Der Umkreis-Scan (${(p.radius||300)} m) um Ihr Grundstück «${esc(p.name)}» (${esc(p.gemeinde||"")}) hat folgende Baugesuche erkannt:<br><br>${rows}<br><br>Bitte Einsprache rechtzeitig prüfen.<br><br>— Nachbar-Radar (automatische Benachrichtigung)</div>`;
+  $("#overlay").classList.add("show");
+}
+function sendMail(){
+  if(!pending)return;$("#overlay").classList.remove("show");
+  toast("E-Mail vorbereitet",`Benachrichtigung an <b>${esc(USER_EMAIL)}</b> für ${pending.length} Baugesuch(e) erstellt (Demo).`);
+  pending=null;
+}
+
+/* ---------- Events ---------- */
+document.addEventListener("click",e=>{
+  const o=e.target.closest("[data-open]");
+  if(o){currentId=o.getAttribute("data-open");const p=cur();
+    if(p){$("#fQuery").value=p.query||"";$("#fRadius").value=String(p.radius||300);}
+    renderAll(false);switchTab("alerts");if(p)doScan(p);return;}
+  const it=e.target.closest(".item[data-pid]");
+  if(it){currentId=it.getAttribute("data-pid");renderAll(false);return;}
+});
+$("#btnScan").addEventListener("click",async()=>{
+  const q=$("#fQuery").value.trim();if(!q){toast("Eingabe fehlt","Bitte Adresse oder Parzelle eingeben.",true);return;}
+  let p=cur();
+  if(!p||p.query!==q){ // Ad-hoc-Scan als temporäres Projekt
+    p={id:uid(),name:q,query:q,radius:parseInt($("#fRadius").value,10),created:Date.now(),adhoc:true};
+    projects.unshift(p);currentId=p.id;
+  }else{p.radius=parseInt($("#fRadius").value,10);}
+  save();$("#btnScan").disabled=true;await doScan(p);$("#btnScan").disabled=false;renderAll(false);
+});
+$("#btnRescan").addEventListener("click",()=>{const p=cur();if(p){p.radius=parseInt($("#fRadius").value,10);save();doScan(p);}});
+$("#fRadius").addEventListener("change",()=>{const p=cur();if(p){p.radius=parseInt($("#fRadius").value,10);save();renderAll(false);}});
+$("#btnAddProject").addEventListener("click",async()=>{
+  const name=$("#pName").value.trim(),q=$("#pQuery").value.trim();
+  if(!name){toast("Name fehlt","Bitte Projektnamen eingeben.",true);return;}
+  if(!q){toast("Adresse fehlt","Bitte Adresse oder Parzelle eingeben.",true);return;}
+  const p={id:uid(),name,query:q,radius:parseInt($("#fRadius").value,10),created:Date.now()};
+  projects.unshift(p);currentId=p.id;save();
+  $("#pName").value="";$("#pQuery").value="";$("#fQuery").value=q;
+  toast("Projekt erfasst",`<b>${esc(name)}</b> wird lokalisiert …`);
+  await doScan(p);renderAll(false);
+});
+$("#btnLoadData").addEventListener("click",async()=>{
+  const url=$("#fData").value.trim()||"baugesuche.geojson";
+  $("#btnLoadData").disabled=true;
+  const ok=await loadData(url);
+  $("#btnLoadData").disabled=false;renderAll(false);
+  if(ok)toast("Datenquelle geladen",`${bauMeta.count} Zürcher Baugesuche importiert.`);
+  else toast("Datenquelle nicht geladen",`${esc(bauMeta.error||"Datei nicht gefunden")}. Siehe Tab «Datenquelle» zur Erzeugung.`,true);
+});
+$("#btnNotifyAll").addEventListener("click",()=>{
+  const p=cur();if(!p||!p.lat){toast("Kein Grundstück","Bitte zuerst scannen.",true);return;}
+  const open=nearbyFor(p).filter(n=>n.daysLeft!=null&&n.daysLeft>0);
+  if(!open.length){toast("Keine offenen Fristen","Im Umkreis liegen keine laufenden Einsprachefristen.",true);return;}
+  openMail(open);
+});
+$("#btnCloseModal").addEventListener("click",()=>{$("#overlay").classList.remove("show");pending=null;});
+$("#btnSendModal").addEventListener("click",sendMail);
+$("#overlay").addEventListener("click",e=>{if(e.target===$("#overlay")){$("#overlay").classList.remove("show");pending=null;}});
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>switchTab(t.dataset.tab)));
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+  document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("active",p.dataset.pane===name));
+}
+$("#yr").textContent=new Date().getFullYear();
+
+/* ---------- Init ---------- */
+load();
+renderSourceStatus("init");
+renderAll(false);
+// Datenquelle automatisch versuchen (still, ohne Fehlermeldung falls Datei fehlt)
+loadData("baugesuche.geojson").then(()=>renderAll(false));
+</script>
+</body>
+</html>
